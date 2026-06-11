@@ -7,26 +7,68 @@
   <style>
     body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
     h1 { font-size: 28px; }
-    a { display: block; padding: 12px 0; font-size: 20px; text-transform: capitalize; }
+    #status { color: #666; margin-bottom: 20px; }
+    a { display: block; padding: 12px 0; font-size: 20px; }
   </style>
 </head>
 <body>
   <h1>Guitar Songs</h1>
+  <div id="status">Loading songs...</div>
   <div id="songs"></div>
 
   <script>
-    const songs = [
-      "example-song.pdf"
-    ];
+    const owner = "justinpavatte";
+    const repo = "guitar-songs";
+    const folder = "songs";
 
-    const box = document.getElementById("songs");
+    function cleanName(fileName) {
+      return decodeURIComponent(fileName)
+        .replace(/\.pdf$/i, "")
+        .replace(/[-_]/g, " ")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
 
-    songs.forEach(file => {
-      const a = document.createElement("a");
-      a.href = "songs/" + file;
-      a.textContent = file.replace(".pdf", "").replaceAll("-", " ");
-      box.appendChild(a);
-    });
+    async function loadSongs() {
+      const status = document.getElementById("status");
+      const box = document.getElementById("songs");
+
+      try {
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${folder}`);
+
+        if (!res.ok) {
+          throw new Error(`GitHub API returned ${res.status}`);
+        }
+
+        const files = await res.json();
+
+        const pdfs = files
+          .filter(file => file.type === "file" && file.name.toLowerCase().endsWith(".pdf"))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        box.innerHTML = "";
+
+        if (pdfs.length === 0) {
+          status.textContent = "No PDF songs found.";
+          return;
+        }
+
+        status.textContent = `${pdfs.length} song${pdfs.length === 1 ? "" : "s"}`;
+
+        pdfs.forEach(file => {
+          const a = document.createElement("a");
+          a.href = `${folder}/${encodeURIComponent(file.name)}`;
+          a.textContent = cleanName(file.name);
+          box.appendChild(a);
+        });
+      } catch (err) {
+        status.textContent = "Could not load song list.";
+        console.error(err);
+      }
+    }
+
+    loadSongs();
   </script>
 </body>
 </html>
