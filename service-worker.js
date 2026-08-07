@@ -1,11 +1,11 @@
-const APP_CACHE = "song-reference-app-v2";
+const APP_CACHE = "song-reference-app-v3";
 const PDF_CACHE = "song-reference-pdfs-v1";
 const API_CACHE = "song-reference-api-v1";
 
 const APP_FILES = [
   "./",
   "./index.html",
-  "./styles.css?v=4"
+  "./styles.css?v=5"
 ];
 
 self.addEventListener("install", event => {

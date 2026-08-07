@@ -9,7 +9,7 @@
   <link rel="manifest" href="site.webmanifest">
   <title>Song Reference</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <main class="page">
@@ -58,12 +58,33 @@
     const searchInput = document.getElementById("search");
     const noResults = document.getElementById("no-results");
     const downloadAllButton = document.getElementById("download-all");
-    const downloadProgress = document.getElementById("download-progress");
-    const downloadProgressStatus = document.getElementById("download-progress-status");
-    const downloadProgressCount = document.getElementById("download-progress-count");
-    const downloadProgressBar = document.getElementById("download-progress-bar");
 
     let songs = [];
+
+
+    async function updateDownloadAllButton() {
+      if (songs.length === 0) {
+        downloadAllButton.disabled = true;
+        downloadAllButton.textContent = "Download All PDFs";
+        return;
+      }
+
+      const cache = await caches.open("song-reference-pdfs-v1");
+
+      for (const song of songs) {
+        const url = `${folder}/${encodeURIComponent(song.fileName)}`;
+        const cached = await cache.match(url);
+
+        if (!cached) {
+          downloadAllButton.disabled = false;
+          downloadAllButton.textContent = "Download All PDFs";
+          return;
+        }
+      }
+
+      downloadAllButton.disabled = true;
+      downloadAllButton.textContent = "All PDFs Downloaded";
+    }
 
     function cleanName(fileName) {
       return decodeURIComponent(fileName)
@@ -97,7 +118,6 @@
             const cached = await cache.match(link.href);
 
             if (!cached) {
-              status.textContent = `Saving ${song.displayName} for offline use...`;
               const response = await fetch(link.href, { cache: "no-store" });
 
               if (!response.ok) {
@@ -172,8 +192,8 @@
         }
 
         searchInput.disabled = false;
-        downloadAllButton.disabled = false;
         renderSongs();
+        await updateDownloadAllButton();
       } catch (error) {
         status.textContent = "Could not load song list.";
         console.error(error);
@@ -186,23 +206,12 @@
 
     downloadAllButton.addEventListener("click", async () => {
       downloadAllButton.disabled = true;
-      downloadAllButton.textContent = "Downloading...";
-      downloadProgress.hidden = false;
-      downloadProgressBar.max = songs.length;
-      downloadProgressBar.value = 0;
-      downloadProgressCount.textContent = `0 / ${songs.length}`;
-      downloadProgressStatus.textContent = "Starting download...";
+      downloadAllButton.textContent = "Downloading";
 
       const cache = await caches.open("song-reference-pdfs-v1");
-      let saved = 0;
-      let failed = 0;
 
-      for (let i = 0; i < songs.length; i++) {
-        const song = songs[i];
+      for (const song of songs) {
         const url = `${folder}/${encodeURIComponent(song.fileName)}`;
-
-        downloadProgressStatus.textContent = `Downloading: ${song.displayName}`;
-        downloadProgressCount.textContent = `${i + 1} / ${songs.length}`;
 
         try {
           const cached = await cache.match(url);
@@ -216,32 +225,12 @@
 
             await cache.put(url, response.clone());
           }
-
-          saved++;
         } catch (error) {
-          failed++;
           console.error(`Could not save ${song.fileName}:`, error);
         }
-
-        downloadProgressBar.value = i + 1;
       }
 
-      if (failed === 0) {
-        downloadProgressStatus.textContent = "Finished — all PDFs are saved offline.";
-        downloadAllButton.textContent = "All PDFs Downloaded";
-      } else {
-        downloadProgressStatus.textContent =
-          `Finished — ${saved} saved, ${failed} failed.`;
-        downloadAllButton.textContent = "Retry Download All PDFs";
-      }
-
-      downloadProgressCount.textContent = `${saved} / ${songs.length} saved`;
-      status.textContent =
-        failed === 0
-          ? `${saved} PDFs saved for offline use.`
-          : `${saved} of ${songs.length} PDFs saved for offline use.`;
-
-      downloadAllButton.disabled = false;
+      await updateDownloadAllButton();
     });
 
     if ("serviceWorker" in navigator) {
