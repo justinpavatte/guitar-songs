@@ -9,7 +9,7 @@
   <link rel="manifest" href="site.webmanifest">
   <title>Song Reference</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <main class="page">
@@ -36,8 +36,16 @@
     </p>
 
     <button id="download-all" class="download-all" type="button" disabled>
-      Download All
+      Download All PDFs
     </button>
+
+    <div id="download-progress" class="download-progress" hidden>
+      <div class="download-progress-text">
+        <span id="download-progress-status">Preparing download...</span>
+        <span id="download-progress-count">0 / 0</span>
+      </div>
+      <progress id="download-progress-bar" value="0" max="100"></progress>
+    </div>
   </main>
 
   <script>
@@ -50,6 +58,10 @@
     const searchInput = document.getElementById("search");
     const noResults = document.getElementById("no-results");
     const downloadAllButton = document.getElementById("download-all");
+    const downloadProgress = document.getElementById("download-progress");
+    const downloadProgressStatus = document.getElementById("download-progress-status");
+    const downloadProgressCount = document.getElementById("download-progress-count");
+    const downloadProgressBar = document.getElementById("download-progress-bar");
 
     let songs = [];
 
@@ -174,30 +186,61 @@
 
     downloadAllButton.addEventListener("click", async () => {
       downloadAllButton.disabled = true;
+      downloadAllButton.textContent = "Downloading...";
+      downloadProgress.hidden = false;
+      downloadProgressBar.max = songs.length;
+      downloadProgressBar.value = 0;
+      downloadProgressCount.textContent = `0 / ${songs.length}`;
+      downloadProgressStatus.textContent = "Starting download...";
+
       const cache = await caches.open("song-reference-pdfs-v1");
       let saved = 0;
+      let failed = 0;
 
       for (let i = 0; i < songs.length; i++) {
         const song = songs[i];
         const url = `${folder}/${encodeURIComponent(song.fileName)}`;
-        status.textContent = `Downloading ${i + 1} of ${songs.length}: ${song.displayName}`;
+
+        downloadProgressStatus.textContent = `Downloading: ${song.displayName}`;
+        downloadProgressCount.textContent = `${i + 1} / ${songs.length}`;
 
         try {
           const cached = await cache.match(url);
+
           if (!cached) {
             const response = await fetch(url, { cache: "no-store" });
+
             if (!response.ok) {
               throw new Error(`PDF returned ${response.status}`);
             }
+
             await cache.put(url, response.clone());
           }
+
           saved++;
         } catch (error) {
+          failed++;
           console.error(`Could not save ${song.fileName}:`, error);
         }
+
+        downloadProgressBar.value = i + 1;
       }
 
-      status.textContent = `${saved} of ${songs.length} PDFs saved for offline use.`;
+      if (failed === 0) {
+        downloadProgressStatus.textContent = "Finished — all PDFs are saved offline.";
+        downloadAllButton.textContent = "All PDFs Downloaded";
+      } else {
+        downloadProgressStatus.textContent =
+          `Finished — ${saved} saved, ${failed} failed.`;
+        downloadAllButton.textContent = "Retry Download All PDFs";
+      }
+
+      downloadProgressCount.textContent = `${saved} / ${songs.length} saved`;
+      status.textContent =
+        failed === 0
+          ? `${saved} PDFs saved for offline use.`
+          : `${saved} of ${songs.length} PDFs saved for offline use.`;
+
       downloadAllButton.disabled = false;
     });
 
