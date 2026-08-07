@@ -9,7 +9,7 @@
   <link rel="manifest" href="site.webmanifest">
   <title>Song Reference</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
   <main class="page">
@@ -39,6 +39,10 @@
       Download All PDFs
     </button>
 
+    <button id="delete-all" class="delete-all" type="button">
+      Delete All Local PDFs
+    </button>
+
     <div id="download-progress" class="download-progress" hidden>
       <div class="download-progress-text">
         <span id="download-progress-status">Preparing download...</span>
@@ -58,6 +62,7 @@
     const searchInput = document.getElementById("search");
     const noResults = document.getElementById("no-results");
     const downloadAllButton = document.getElementById("download-all");
+    const deleteAllButton = document.getElementById("delete-all");
 
     let songs = [];
 
@@ -236,6 +241,18 @@
           console.error(`Could not save ${song.fileName}:`, error);
         }
       }
+
+      await updateDownloadAllButton();
+    });
+
+    deleteAllButton.addEventListener("click", async () => {
+      deleteAllButton.disabled = true;
+      deleteAllButton.textContent = "Deleting...";
+
+      await caches.delete("song-reference-pdfs-v1");
+
+      deleteAllButton.textContent = "Delete All Local PDFs";
+      deleteAllButton.disabled = false;
 
       await updateDownloadAllButton();
     });

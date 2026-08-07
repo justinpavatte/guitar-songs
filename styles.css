@@ -252,3 +252,31 @@ h1 {
 }
 
 
+
+
+.delete-all {
+  display: block;
+  width: 100%;
+  min-height: 54px;
+  margin-top: 12px;
+  padding: 14px 18px;
+  border: 1px solid #8b949e;
+  border-radius: 12px;
+  background: #161b22;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.delete-all:hover:not(:disabled) {
+  background: #1f2630;
+}
+
+.delete-all:disabled {
+  cursor: default;
+  border-color: #484f58;
+  background: #30363d;
+  color: var(--muted);
+}
