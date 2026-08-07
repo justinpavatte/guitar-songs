@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -72,6 +72,30 @@
         link.className = "song-link";
         link.href = `${folder}/${encodeURIComponent(song.fileName)}`;
         link.textContent = song.displayName;
+        link.addEventListener("click", async event => {
+          event.preventDefault();
+
+          try {
+            const cache = await caches.open("song-reference-pdfs-v1");
+            const cached = await cache.match(link.href);
+
+            if (!cached) {
+              status.textContent = `Saving ${song.displayName} for offline use...`;
+              const response = await fetch(link.href, { cache: "no-store" });
+
+              if (!response.ok) {
+                throw new Error(`PDF returned ${response.status}`);
+              }
+
+              await cache.put(link.href, response.clone());
+            }
+          } catch (error) {
+            console.error("Could not pre-cache PDF:", error);
+          }
+
+          window.location.href = link.href;
+        });
+
         songList.appendChild(link);
       });
 
@@ -87,13 +111,27 @@
     }
 
     async function loadSongs() {
-      try {
-        const response = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/contents/${folder}`
-        );
+      const apiUrl =
+        `https://api.github.com/repos/${owner}/${repo}/contents/${folder}`;
+      const apiCache = await caches.open("song-reference-api-v1");
 
-        if (!response.ok) {
-          throw new Error(`GitHub API returned ${response.status}`);
+      try {
+        let response;
+
+        try {
+          response = await fetch(apiUrl, { cache: "no-store" });
+
+          if (!response.ok) {
+            throw new Error(`GitHub API returned ${response.status}`);
+          }
+
+          await apiCache.put(apiUrl, response.clone());
+        } catch (networkError) {
+          response = await apiCache.match(apiUrl);
+
+          if (!response) {
+            throw networkError;
+          }
         }
 
         const files = await response.json();
@@ -127,6 +165,16 @@
     searchInput.addEventListener("input", event => {
       renderSongs(event.target.value);
     });
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js").catch(error => {
+        console.error("Service worker registration failed:", error);
+      });
+    }
+
+    if (navigator.storage?.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
 
     loadSongs();
   </script>
