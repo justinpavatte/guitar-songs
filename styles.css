@@ -11,6 +11,7 @@
   --muted: #8b949e;
   --accent: #58a6ff;
   --accent-hover: #79c0ff;
+  --header-accent: #e3b341;
 
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
 }
@@ -53,10 +54,12 @@ body {
 
 .page-header {
   margin-bottom: 24px;
+  text-align: center;
 }
 
 h1 {
   margin: 0 0 8px;
+  color: var(--header-accent);
   font-size: clamp(2rem, 7vw, 3rem);
   line-height: 1.1;
   letter-spacing: -0.04em;
