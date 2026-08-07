@@ -218,7 +218,7 @@
 
     downloadAllButton.addEventListener("click", async () => {
       downloadAllButton.disabled = true;
-      downloadAllButton.textContent = "Downloading";
+      downloadAllButton.textContent = "Downloading...";
 
       const cache = await caches.open("song-reference-pdfs-v1");
 
