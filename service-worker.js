@@ -1,4 +1,4 @@
-const APP_CACHE = "song-reference-app-v3";
+const APP_CACHE = "song-reference-app-v4";
 const PDF_CACHE = "song-reference-pdfs-v1";
 const API_CACHE = "song-reference-api-v1";
 
