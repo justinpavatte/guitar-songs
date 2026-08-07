@@ -80,7 +80,6 @@
             const cached = await cache.match(link.href);
 
             if (!cached) {
-              status.textContent = `Saving ${song.displayName} for offline use...`;
               const response = await fetch(link.href, { cache: "no-store" });
 
               if (!response.ok) {
