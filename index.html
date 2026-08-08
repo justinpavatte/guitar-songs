@@ -9,7 +9,7 @@
   <link rel="manifest" href="site.webmanifest">
   <title>Song Reference</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
   <main class="page">
@@ -29,7 +29,14 @@
       >
     </div>
 
-    <div id="songs" class="song-list"></div>
+    <div id="songs" class="song-list is-loading" aria-busy="true">
+      <div class="song-skeleton" aria-hidden="true"></div>
+      <div class="song-skeleton" aria-hidden="true"></div>
+      <div class="song-skeleton" aria-hidden="true"></div>
+      <div class="song-skeleton" aria-hidden="true"></div>
+      <div class="song-skeleton" aria-hidden="true"></div>
+      <div class="song-skeleton" aria-hidden="true"></div>
+    </div>
 
     <p id="no-results" class="no-results" hidden>
       No matching songs found.
@@ -115,7 +122,7 @@
         song.displayName.toLowerCase().includes(searchText)
       );
 
-      songList.innerHTML = "";
+      const fragment = document.createDocumentFragment();
 
       filteredSongs.forEach(song => {
         const link = document.createElement("a");
@@ -145,8 +152,12 @@
           window.location.href = link.href;
         });
 
-        songList.appendChild(link);
+        fragment.appendChild(link);
       });
+
+      songList.replaceChildren(fragment);
+      songList.classList.remove("is-loading");
+      songList.setAttribute("aria-busy", "false");
 
       noResults.hidden = filteredSongs.length !== 0;
 
@@ -203,10 +214,13 @@
           return;
         }
 
-        searchInput.disabled = false;
         renderSongs();
+        searchInput.disabled = false;
         await updateDownloadAllButton();
       } catch (error) {
+        songList.replaceChildren();
+        songList.classList.remove("is-loading");
+        songList.setAttribute("aria-busy", "false");
         status.textContent = "Could not load song list.";
         console.error(error);
       }
