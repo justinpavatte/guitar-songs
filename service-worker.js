@@ -1,6 +1,6 @@
-const APP_CACHE = "song-reference-app-v6";
+const APP_CACHE = "song-reference-app-v7";
 const PDF_CACHE = "song-reference-pdfs-v1";
-const API_CACHE = "song-reference-api-v1";
+const LIST_CACHE = "song-reference-list-v1";
 
 const APP_FILES = [
   "./",
@@ -21,8 +21,8 @@ self.addEventListener("activate", event => {
       Promise.all(
         keys
           .filter(key =>
-            key.startsWith("song-reference-app-") &&
-            key !== APP_CACHE
+            (key.startsWith("song-reference-app-") && key !== APP_CACHE) ||
+            key === "song-reference-api-v1"
           )
           .map(key => caches.delete(key))
       )
@@ -44,8 +44,8 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  if (url.hostname === "api.github.com") {
-    event.respondWith(networkFirst(request, API_CACHE));
+  if (url.origin === self.location.origin && url.pathname.endsWith("/songs.php")) {
+    event.respondWith(networkFirst(request, LIST_CACHE));
     return;
   }
 
