@@ -74,10 +74,13 @@
 
 
     function getPdfUrl(song) {
-      return new URL(
+      const url = new URL(
         `${folder}/${encodeURIComponent(song.fileName)}`,
         document.baseURI
-      ).href;
+      );
+
+      url.searchParams.set("v", song.version);
+      return url.href;
     }
 
     async function updateDownloadAllButton() {
@@ -126,30 +129,8 @@
       filteredSongs.forEach(song => {
         const link = document.createElement("a");
         link.className = "song-link";
-        link.href = `${folder}/${encodeURIComponent(song.fileName)}`;
+        link.href = getPdfUrl(song);
         link.textContent = song.displayName;
-        link.addEventListener("click", async event => {
-          event.preventDefault();
-
-          try {
-            const cache = await caches.open("song-reference-pdfs-v1");
-            const cached = await cache.match(link.href);
-
-            if (!cached) {
-              const response = await fetch(link.href, { cache: "no-store" });
-
-              if (!response.ok) {
-                throw new Error(`PDF returned ${response.status}`);
-              }
-
-              await cache.put(link.href, response.clone());
-            }
-          } catch (error) {
-            console.error("Could not pre-cache PDF:", error);
-          }
-
-          window.location.href = link.href;
-        });
 
         fragment.appendChild(link);
       });
@@ -194,9 +175,10 @@
         const files = await response.json();
 
         songs = files
-          .map(fileName => ({
-            fileName,
-            displayName: cleanName(fileName)
+          .map(file => ({
+            fileName: file.fileName,
+            version: file.version,
+            displayName: cleanName(file.fileName)
           }))
           .sort((a, b) =>
             a.displayName.localeCompare(b.displayName)

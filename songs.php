@@ -21,9 +21,18 @@ foreach (scandir($songsDir) as $fileName) {
     $fullPath = $songsDir . DIRECTORY_SEPARATOR . $fileName;
 
     if (is_file($fullPath) && strcasecmp(pathinfo($fileName, PATHINFO_EXTENSION), 'pdf') === 0) {
-        $files[] = $fileName;
+        $modified = filemtime($fullPath);
+        $size = filesize($fullPath);
+
+        $files[] = [
+            'fileName' => $fileName,
+            'version' => $modified . '-' . $size,
+        ];
     }
 }
 
-natcasesort($files);
-echo json_encode(array_values($files), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+usort($files, static function (array $a, array $b): int {
+    return strnatcasecmp($a['fileName'], $b['fileName']);
+});
+
+echo json_encode($files, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

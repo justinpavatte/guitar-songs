@@ -1,4 +1,4 @@
-const APP_CACHE = "song-reference-app-v7";
+const APP_CACHE = "song-reference-app-v8";
 const PDF_CACHE = "song-reference-pdfs-v1";
 const LIST_CACHE = "song-reference-list-v1";
 
@@ -101,8 +101,11 @@ async function handlePdfRequest(request) {
     response = await fetch(new Request(request.url, { cache: "no-store" }));
 
     if (response.ok && response.status === 200) {
+      response = withPdfHeaders(response);
       await cache.put(request.url, response.clone());
     }
+  } else {
+    response = withPdfHeaders(response);
   }
 
   const rangeHeader = request.headers.get("range");
@@ -112,6 +115,19 @@ async function handlePdfRequest(request) {
   }
 
   return createRangeResponse(response, rangeHeader);
+}
+
+function withPdfHeaders(response) {
+  const headers = new Headers(response.headers);
+  headers.set("Content-Type", "application/pdf");
+  headers.set("Content-Disposition", "inline");
+  headers.set("Accept-Ranges", "bytes");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
 }
 
 async function createRangeResponse(response, rangeHeader) {
@@ -159,6 +175,8 @@ async function createRangeResponse(response, rangeHeader) {
   const chunk = buffer.slice(start, end + 1);
   const headers = new Headers(response.headers);
 
+  headers.set("Content-Type", "application/pdf");
+  headers.set("Content-Disposition", "inline");
   headers.set("Accept-Ranges", "bytes");
   headers.set("Content-Length", String(chunk.byteLength));
   headers.set("Content-Range", `bytes ${start}-${end}/${size}`);
