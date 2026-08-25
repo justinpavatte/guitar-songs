@@ -1,12 +1,12 @@
-const APP_CACHE = "song-reference-app-v11";
+const APP_CACHE = "song-reference-app-v12";
 const PDF_CACHE = "song-reference-pdfs-v1";
 const LIST_CACHE = "song-reference-list-v1";
 
 const APP_FILES = [
   "./",
   "./index.html",
-  "./styles.css?v=20260824-3",
-  "./site.webmanifest?v=20260824-1",
+  "./styles.css?v=20260824-4",
+  "./site.webmanifest?v=20260824-2",
   "./favicon/apple-touch-icon.png?v=20260824-1",
   "./favicon/favicon-32x32.png?v=20260824-1",
   "./favicon/favicon-16x16.png?v=20260824-1",
@@ -22,19 +22,30 @@ self.addEventListener("install", event => {
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key =>
-            (key.startsWith("song-reference-app-") && key !== APP_CACHE) ||
-            key === "song-reference-api-v1"
-          )
-          .map(key => caches.delete(key))
-      )
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    const oldAppCaches = keys.filter(key =>
+      key.startsWith("song-reference-app-") && key !== APP_CACHE
+    );
+
+    await Promise.all(
+      keys
+        .filter(key => oldAppCaches.includes(key) || key === "song-reference-api-v1")
+        .map(key => caches.delete(key))
+    );
+
+    await self.clients.claim();
+
+    // When a newly deployed service worker takes over, refresh open pages once.
+    // This prevents the stale-while-revalidate app shell from requiring a
+    // second manual refresh to display the newly deployed version.
+    if (oldAppCaches.length > 0) {
+      const clients = await self.clients.matchAll({ type: "window" });
+      await Promise.all(
+        clients.map(client => client.navigate(client.url).catch(() => null))
+      );
+    }
+  })());
 });
 
 self.addEventListener("fetch", event => {
