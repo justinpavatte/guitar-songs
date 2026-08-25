@@ -1,11 +1,11 @@
-const APP_CACHE = "song-reference-app-v10";
+const APP_CACHE = "song-reference-app-v11";
 const PDF_CACHE = "song-reference-pdfs-v1";
 const LIST_CACHE = "song-reference-list-v1";
 
 const APP_FILES = [
   "./",
   "./index.html",
-  "./styles.css?v=20260824-2",
+  "./styles.css?v=20260824-3",
   "./site.webmanifest?v=20260824-1",
   "./favicon/apple-touch-icon.png?v=20260824-1",
   "./favicon/favicon-32x32.png?v=20260824-1",
