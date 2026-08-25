@@ -9,13 +9,12 @@
   <title>Song Reference</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0d1117">
-  <link rel="stylesheet" href="styles.css?v=20260824-1">
+  <link rel="stylesheet" href="styles.css?v=20260824-2">
 </head>
 <body>
   <main class="page">
     <header class="page-header">
       <h1>Song Reference</h1>
-      <p id="status">Loading songs...</p>
     </header>
 
     <div class="search-container">
@@ -66,7 +65,6 @@
     const pdfCacheName = "song-reference-pdfs-v1";
     const songListStorageKey = "song-reference-song-list-v1";
 
-    const status = document.getElementById("status");
     const songList = document.getElementById("songs");
     const searchInput = document.getElementById("search");
     const noResults = document.getElementById("no-results");
@@ -154,11 +152,6 @@
       songList.setAttribute("aria-busy", "false");
       noResults.hidden = filteredSongs.length !== 0;
 
-      if (searchText === "") {
-        status.textContent = `${songs.length} song${songs.length === 1 ? "" : "s"}`;
-      } else {
-        status.textContent = `${filteredSongs.length} of ${songs.length} songs`;
-      }
     }
 
     function useSongFiles(files) {
@@ -264,7 +257,6 @@
         songList.replaceChildren();
         songList.classList.remove("is-loading");
         songList.setAttribute("aria-busy", "false");
-        status.textContent = "No offline song list available.";
         console.error(error);
       }
     }
