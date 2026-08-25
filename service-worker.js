@@ -1,11 +1,17 @@
-const APP_CACHE = "song-reference-app-v8";
+const APP_CACHE = "song-reference-app-v9";
 const PDF_CACHE = "song-reference-pdfs-v1";
 const LIST_CACHE = "song-reference-list-v1";
 
 const APP_FILES = [
   "./",
   "./index.html",
-  "./styles.css?v=7"
+  "./styles.css?v=20260824-1",
+  "./site.webmanifest?v=20260824-1",
+  "./favicon/apple-touch-icon.png?v=20260824-1",
+  "./favicon/favicon-32x32.png?v=20260824-1",
+  "./favicon/favicon-16x16.png?v=20260824-1",
+  "./favicon/android-chrome-192x192.png?v=20260824-1",
+  "./favicon/android-chrome-512x512.png?v=20260824-1"
 ];
 
 self.addEventListener("install", event => {
@@ -35,55 +41,66 @@ self.addEventListener("fetch", event => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (request.method !== "GET") {
+  if (request.method !== "GET" || url.origin !== self.location.origin) {
     return;
   }
 
-  if (url.origin === self.location.origin && url.pathname.toLowerCase().endsWith(".pdf")) {
+  if (url.pathname.toLowerCase().endsWith(".pdf")) {
     event.respondWith(handlePdfRequest(request));
     return;
   }
 
-  if (url.origin === self.location.origin && url.pathname.endsWith("/songs.php")) {
-    event.respondWith(networkFirst(request, LIST_CACHE));
+  if (url.pathname.endsWith("/songs.php")) {
+    if (url.searchParams.has("refresh")) {
+      event.respondWith(refreshSongList(request));
+    } else {
+      event.respondWith(staleWhileRevalidate(request, LIST_CACHE, true));
+    }
     return;
   }
 
-  if (url.origin === self.location.origin) {
-    event.respondWith(networkFirst(request, APP_CACHE));
-  }
+  event.respondWith(staleWhileRevalidate(request, APP_CACHE));
 });
 
-async function cacheFirst(request, cacheName) {
+async function staleWhileRevalidate(request, cacheName, ignoreSearch = false) {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
+  const cached = await cache.match(request, { ignoreSearch });
+
+  const networkUpdate = fetch(request)
+    .then(async response => {
+      if (response.ok) {
+        await cache.put(request, response.clone());
+      }
+      return response;
+    })
+    .catch(() => null);
 
   if (cached) {
     return cached;
   }
 
-  const response = await fetch(request);
-
-  if (response.ok) {
-    await cache.put(request, response.clone());
+  const response = await networkUpdate;
+  if (response) {
+    return response;
   }
 
-  return response;
+  throw new Error("Resource unavailable offline.");
 }
 
-async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
+async function refreshSongList(request) {
+  const cache = await caches.open(LIST_CACHE);
 
   try {
     const response = await fetch(request);
 
     if (response.ok) {
-      await cache.put(request, response.clone());
+      const canonicalRequest = new Request(new URL("./songs.php", self.location.href));
+      await cache.put(canonicalRequest, response.clone());
     }
 
     return response;
   } catch (error) {
-    const cached = await cache.match(request);
+    const cached = await cache.match("./songs.php", { ignoreSearch: true });
 
     if (cached) {
       return cached;

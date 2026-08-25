@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <!-- https://favicon.io/favicon-converter/ -->
-  <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png">
-  <link rel="manifest" href="site.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png?v=20260824-1">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon/favicon-32x32.png?v=20260824-1">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon/favicon-16x16.png?v=20260824-1">
+  <link rel="manifest" href="site.webmanifest?v=20260824-1">
   <title>Song Reference</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <meta name="theme-color" content="#0d1117">
+  <link rel="stylesheet" href="styles.css?v=20260824-1">
 </head>
 <body>
   <main class="page">
@@ -62,6 +62,9 @@
   <script>
     const folder = "songs";
     const songListUrl = "songs.php";
+    const listCacheName = "song-reference-list-v1";
+    const pdfCacheName = "song-reference-pdfs-v1";
+    const songListStorageKey = "song-reference-song-list-v1";
 
     const status = document.getElementById("status");
     const songList = document.getElementById("songs");
@@ -71,7 +74,6 @@
     const deleteAllButton = document.getElementById("delete-all");
 
     let songs = [];
-
 
     function getPdfUrl(song) {
       const url = new URL(
@@ -90,11 +92,10 @@
         return;
       }
 
-      const cache = await caches.open("song-reference-pdfs-v1");
+      const cache = await caches.open(pdfCacheName);
 
       for (const song of songs) {
-        const url = getPdfUrl(song);
-        const cached = await cache.match(url);
+        const cached = await cache.match(getPdfUrl(song));
 
         if (!cached) {
           downloadAllButton.disabled = false;
@@ -118,13 +119,26 @@
         .trim();
     }
 
+    function normalizeSongs(files) {
+      if (!Array.isArray(files)) {
+        throw new Error("Song list is not an array.");
+      }
+
+      return files
+        .filter(file => file && file.fileName && file.version != null)
+        .map(file => ({
+          fileName: String(file.fileName),
+          version: String(file.version),
+          displayName: cleanName(String(file.fileName))
+        }))
+        .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    }
+
     function renderSongs(filterText = "") {
       const searchText = filterText.trim().toLowerCase();
-
       const filteredSongs = songs.filter(song =>
         song.displayName.toLowerCase().includes(searchText)
       );
-
       const fragment = document.createDocumentFragment();
 
       filteredSongs.forEach(song => {
@@ -132,72 +146,125 @@
         link.className = "song-link";
         link.href = getPdfUrl(song);
         link.textContent = song.displayName;
-
         fragment.appendChild(link);
       });
 
       songList.replaceChildren(fragment);
       songList.classList.remove("is-loading");
       songList.setAttribute("aria-busy", "false");
-
       noResults.hidden = filteredSongs.length !== 0;
 
       if (searchText === "") {
-        status.textContent =
-          `${songs.length} song${songs.length === 1 ? "" : "s"}`;
+        status.textContent = `${songs.length} song${songs.length === 1 ? "" : "s"}`;
       } else {
-        status.textContent =
-          `${filteredSongs.length} of ${songs.length} songs`;
+        status.textContent = `${filteredSongs.length} of ${songs.length} songs`;
+      }
+    }
+
+    function useSongFiles(files) {
+      songs = normalizeSongs(files);
+      renderSongs(searchInput.value);
+      searchInput.disabled = songs.length === 0;
+      updateDownloadAllButton().catch(console.error);
+    }
+
+    function saveSongList(files) {
+      try {
+        localStorage.setItem(songListStorageKey, JSON.stringify(files));
+      } catch (error) {
+        console.warn("Could not save song list to local storage:", error);
+      }
+    }
+
+    function loadSongListFromStorage() {
+      try {
+        const stored = localStorage.getItem(songListStorageKey);
+        return stored ? JSON.parse(stored) : null;
+      } catch (error) {
+        console.warn("Could not read saved song list:", error);
+        return null;
+      }
+    }
+
+    async function loadSongListFromCache() {
+      try {
+        const cache = await caches.open(listCacheName);
+        const response = await cache.match(songListUrl, { ignoreSearch: true });
+        return response ? await response.json() : null;
+      } catch (error) {
+        console.warn("Could not read cached song list:", error);
+        return null;
+      }
+    }
+
+    function songFilesSignature(files) {
+      return JSON.stringify(
+        files.map(file => [String(file.fileName), String(file.version)])
+      );
+    }
+
+    async function refreshSongListInBackground(existingSignature = "") {
+      try {
+        const refreshUrl = `${songListUrl}?refresh=${Date.now()}`;
+        const response = await fetch(refreshUrl, { cache: "no-store" });
+
+        if (!response.ok) {
+          throw new Error(`Song list returned ${response.status}`);
+        }
+
+        const files = await response.json();
+        const normalized = normalizeSongs(files);
+        const newSignature = songFilesSignature(normalized);
+
+        saveSongList(files);
+
+        if (newSignature !== existingSignature) {
+          songs = normalized;
+          renderSongs(searchInput.value);
+          searchInput.disabled = songs.length === 0;
+          updateDownloadAllButton().catch(console.error);
+        }
+      } catch (error) {
+        // A failed refresh is deliberately silent when offline data is usable.
+        console.debug("Background song refresh unavailable:", error);
       }
     }
 
     async function loadSongs() {
-      const listCache = await caches.open("song-reference-list-v1");
+      let loadedFiles = loadSongListFromStorage();
+
+      if (!loadedFiles) {
+        loadedFiles = await loadSongListFromCache();
+      }
+
+      if (loadedFiles) {
+        try {
+          useSongFiles(loadedFiles);
+          const signature = songFilesSignature(songs);
+          refreshSongListInBackground(signature);
+          return;
+        } catch (error) {
+          console.warn("Saved song list was invalid:", error);
+        }
+      }
 
       try {
-        let response;
+        const response = await fetch(`${songListUrl}?refresh=${Date.now()}`, {
+          cache: "no-store"
+        });
 
-        try {
-          response = await fetch(songListUrl, { cache: "no-store" });
-
-          if (!response.ok) {
-            throw new Error(`Song list returned ${response.status}`);
-          }
-
-          await listCache.put(songListUrl, response.clone());
-        } catch (networkError) {
-          response = await listCache.match(songListUrl);
-
-          if (!response) {
-            throw networkError;
-          }
+        if (!response.ok) {
+          throw new Error(`Song list returned ${response.status}`);
         }
 
         const files = await response.json();
-
-        songs = files
-          .map(file => ({
-            fileName: file.fileName,
-            version: file.version,
-            displayName: cleanName(file.fileName)
-          }))
-          .sort((a, b) =>
-            a.displayName.localeCompare(b.displayName)
-          );
-
-        if (songs.length === 0) {
-          status.textContent = "No songs found.";
-          return;
-        }
-
-        renderSongs();
-        searchInput.disabled = false;
-        await updateDownloadAllButton();
+        saveSongList(files);
+        useSongFiles(files);
       } catch (error) {
         songList.replaceChildren();
         songList.classList.remove("is-loading");
         songList.setAttribute("aria-busy", "false");
-        status.textContent = "Could not load song list.";
+        status.textContent = "No offline song list available.";
         console.error(error);
       }
     }
@@ -210,7 +277,7 @@
       downloadAllButton.disabled = true;
       downloadAllButton.textContent = "Downloading...";
 
-      const cache = await caches.open("song-reference-pdfs-v1");
+      const cache = await caches.open(pdfCacheName);
 
       for (const song of songs) {
         const url = getPdfUrl(song);
@@ -239,7 +306,7 @@
       deleteAllButton.disabled = true;
       deleteAllButton.textContent = "Deleting...";
 
-      await caches.delete("song-reference-pdfs-v1");
+      await caches.delete(pdfCacheName);
 
       deleteAllButton.textContent = "Delete All";
       deleteAllButton.disabled = false;
@@ -248,7 +315,7 @@
     });
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("service-worker.js").catch(error => {
+      navigator.serviceWorker.register("service-worker.js?v=20260824-1").catch(error => {
         console.error("Service worker registration failed:", error);
       });
     }
