@@ -7,3 +7,5 @@ git add .
 git commit -m "no comment"
 git push
 ssh ha "cd /srv/www/%REPO% && git pull"
+
+pause
